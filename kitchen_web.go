@@ -27,23 +27,31 @@ func (kw *KitchenWeb) start() {
 	}
 }
 
-func (kw *KitchenWeb) deliver(delivery *Delivery) {
+func (kw *KitchenWeb) deliver(delivery *Delivery) bool {
 
 	requestBody, marshallErr := json.Marshal(delivery)
 	if marshallErr != nil {
-		fmt.Println("Marshalling error:", marshallErr)
+		log.Fatal(marshallErr)
 	}
 
 	request, newRequestError := http.NewRequest(http.MethodPost, diningHallHost+diningHallPort+"/delivery", bytes.NewBuffer(requestBody))
 	if newRequestError != nil {
 		fmt.Println("Could not create new request. Error:", newRequestError)
+		log.Fatal(newRequestError)
 	} else {
-		_, doError := kw.kitchenClient.Do(request)
+		response, doError := kw.kitchenClient.Do(request)
 		if doError != nil {
-			fmt.Println("ERROR Sending request. ERR:",doError)
-			return
+			fmt.Println("ERROR Sending request. ERR:", doError)
+			log.Fatal(doError)
 		}
+		var responseBody = make([]byte, response.ContentLength)
+		response.Body.Read(responseBody)
+		if string(responseBody) != "OK" {
+			return false
+		}
+		return true
 	}
+	return true
 }
 
 func (kw *KitchenWeb) establishConnection() bool {

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"math/rand"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -45,39 +48,58 @@ func NewCook(cook *Cook) *Cook {
 func (c *Cook) startWorking() {
 	c.atWork = 1
 	for c.atWork == 1 {
-		meal := kitchen.orderList.getMeal(c)
-		if meal != nil {
-			now := time.Now().Unix()
-			c.statusId = 1
-			c.orderId = meal.parent.id
-			c.foodId = meal.foodId
-			c.timeStarted = now
-			c.timeRequired = meal.timeRequired
-			switch meal.apparatus {
-			case 0:
-				c.apparatusType = 0
-				meal.prepare(c, now)
-			case 1:
-				c.apparatusType = 1
-				apparatus , waitApparatus := kitchen.ovens.getApparatusAndWait(now)
-				c.timeRequired += waitApparatus
-				apparatus.useApparatus(c,meal,now)
-			case 2:
-				c.apparatusType = 2
-				apparatus , waitApparatus := kitchen.stoves.getApparatusAndWait(now)
-				c.timeRequired += waitApparatus
-				apparatus.useApparatus(c,meal,now)
-			}
+		didATask := false
+		var wg sync.WaitGroup
+		stuffToDo := rand.Intn(c.proficiency) + 1
+		for i := 0; i < stuffToDo; i++ {
+			wg.Add(1)
+			go func() {
+				meal := kitchen.orderList.getMeal(c)
+				if meal != nil {
+					didATask = true
+					now := getUnixTimeUnits()
+					c.statusId = 1
+					c.orderId = meal.parent.id
+					c.foodId = meal.foodId
+					c.timeStarted = now
+					c.timeRequired = meal.timeRequired
+					switch meal.apparatus {
+					case 0:
+						c.apparatusType = 0
+						meal.prepare(c, now)
+					case 1:
+						c.apparatusType = 1
+						apparatus, waitApparatus := kitchen.ovens.getApparatusAndWait(now)
+						c.timeRequired += waitApparatus
+						apparatus.useApparatus(c, meal, now)
+					case 2:
+						c.apparatusType = 2
+						apparatus, waitApparatus := kitchen.stoves.getApparatusAndWait(now)
+						c.timeRequired += waitApparatus
+						apparatus.useApparatus(c, meal, now)
+					}
+				}
+				wg.Done()
+			}()
 		}
+		wg.Wait()
+
 		delivery := kitchen.orderList.getDelivery()
 		if delivery != nil {
-			c.statusId = 2
-			kitchen.kitchenWeb.deliver(delivery)
+			success := false
+			for success == false {
+				didATask = true
+				c.statusId = 2
+				success = kitchen.kitchenWeb.deliver(delivery)
+				if success == false {
+					fmt.Println("OH NO")
+				}
+			}
 		}
-		if meal == nil && delivery == nil {
+		if !didATask {
 			//Sleep for one second when there is nothing to do
 			c.statusId = 0
-			time.Sleep(time.Second)
+			time.Sleep(timeUnit)
 		}
 	}
 }
@@ -93,7 +115,7 @@ func (c *Cook) getStatus() string {
 		if c.apparatusType != 0 {
 			ret += " using " + idToApparatus[c.apparatusType]
 		}
-		ret += " time left:" +strconv.Itoa(c.timeRequired - int(time.Now().Unix() - c.timeStarted))
+		ret += " time left:" + strconv.Itoa(c.timeRequired-int(getUnixTimeUnits()-c.timeStarted))
 	}
 
 	return ret

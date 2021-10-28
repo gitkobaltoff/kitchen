@@ -23,20 +23,15 @@ func (k *Kitchen) start() {
 
 func (k *Kitchen) tryConnectDiningHall() {
 	k.connected = false
-	for k.connected {
+	for !k.connected {
 		if k.kitchenWeb.establishConnection() {
 			k.connectionSuccessful()
 			break
 		} else {
-			time.Sleep(time.Second)
+			time.Sleep(timeUnit)
 		}
 	}
 }
-
-func (k *Kitchen) deliver(delivery *Delivery) {
-	k.kitchenWeb.deliver(delivery)
-}
-
 func (k *Kitchen) connectionSuccessful() {
 	if k.connected {
 		return

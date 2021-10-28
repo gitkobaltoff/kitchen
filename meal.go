@@ -59,7 +59,7 @@ func (m *Meal) prepare(cook *Cook, now int64) {
 	writeMeal.preparingTime = now
 	writeMeal.cookId = cook.id
 	m.set(writeMeal)
-	time.Sleep(time.Duration(m.timeRequired) * time.Second)
+	time.Sleep(time.Duration(m.timeRequired) * timeUnit)
 	writeMeal.busy = 1
 	writeMeal.prepared = 1
 	writeMeal.parent.mealCounter -= 1

@@ -1,19 +1,28 @@
 package main
 
-import "os"
+import (
+	"math/rand"
+	"os"
+	"time"
+)
 
 var diningHallHost = "http://localhost"
 
 const diningHallPort = ":7500"
 const kitchenServerPort = ":8000"
-//todo fix multiple delivery problemd
-const cookN = 4
-const ovenN = 2
-const stoveN = 1
+
+const cookN = 3
+const ovenN = 3
+const stoveN = 2
+const orderListMaxSize = 3
+
+const timeUnit = 100 * time.Millisecond
 
 var kitchen Kitchen
+
 func main() {
-	if args := os.Args; len(args) > 1{
+	rand.Seed(69)
+	if args := os.Args; len(args) > 1 {
 		//Set the docker internal host
 		diningHallHost = args[1]
 	}

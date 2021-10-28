@@ -29,7 +29,7 @@ func parseOrder(postOrder *PostOrder) *Order {
 }
 
 func (order Order) isReady() bool {
-	if order.mealCounter != 0 {
+	if order.mealCounter > 0 {
 		return false
 	}
 	return true

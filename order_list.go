@@ -4,7 +4,6 @@ import (
 	"math"
 	"strconv"
 	"sync"
-	"time"
 )
 
 func removeFromArr(arr *[]*Meal, ptr *Meal) {
@@ -27,6 +26,14 @@ type OrderList struct {
 	stoveList     []*Meal
 	nilList       []*Meal
 	orderArr      []*Order
+	maxLen        int
+}
+
+func getPriority(meal *Meal, timeLeft int) float64 {
+	maxWait := meal.parent.maxWait
+	orderPriority := meal.parent.priority
+	numMeals := int(meal.parent.mealCounter)
+	return math.Tanh(float64(numMeals+meal.complexity+orderPriority)/3)*2 - math.Tanh(1-float64(timeLeft)/float64(maxWait))
 }
 
 func NewOrderList() *OrderList {
@@ -37,10 +44,16 @@ func NewOrderList() *OrderList {
 	ret.stoveList = []*Meal{}
 	ret.nilList = []*Meal{}
 	ret.orderArr = []*Order{}
+	ret.maxLen = orderListMaxSize
 	return ret
 }
 
-func (orderList *OrderList) addOrder(order *Order) {
+func (orderList *OrderList) addOrder(order *Order) bool {
+	orderList.deliveryMutex.Lock()
+	defer orderList.deliveryMutex.Unlock()
+	if len(orderList.orderArr) >= orderList.maxLen{
+		return false
+	}
 	orderList.orderArr = append(orderList.orderArr, order)
 	for _, meal := range order.mealList {
 		apparatusId := meal.apparatus
@@ -53,6 +66,7 @@ func (orderList *OrderList) addOrder(order *Order) {
 			orderList.stoveList = append(orderList.stoveList, meal)
 		}
 	}
+	return true
 }
 
 func (orderList *OrderList) getDelivery() *Delivery {
@@ -85,16 +99,16 @@ func (orderList *OrderList) getMeal(cook *Cook) *Meal {
 	orderList.mealMutex.Lock()
 	defer orderList.mealMutex.Unlock()
 
-	now := time.Now().Unix()
-	overallMin := math.MaxInt64
-	var ret *Meal //TODO make higher rank cooks take the higher orders first
+	now := getUnixTimeUnits()
+	var priority float64 = 0
+	var ret *Meal
 	ovenTimeLeft := kitchen.ovens.getTimeLeft(now)
 	for _, meal := range orderList.ovenList {
 		readMeal := meal.get()
 		if readMeal.prepared == 0 && readMeal.busy == 0 && readMeal.complexity <= cook.rank {
-			timeLeft := readMeal.getTimeLeft(now) + ovenTimeLeft
-			if overallMin > timeLeft {
-				overallMin = timeLeft
+			localPriority := getPriority(readMeal, readMeal.getTimeLeft(now)+ovenTimeLeft)
+			if priority < localPriority {
+				priority = localPriority
 				ret = readMeal
 			}
 		}
@@ -103,9 +117,9 @@ func (orderList *OrderList) getMeal(cook *Cook) *Meal {
 	for _, meal := range orderList.stoveList {
 		readMeal := meal.get()
 		if readMeal.prepared == 0 && readMeal.busy == 0 && readMeal.complexity <= cook.rank {
-			timeLeft := readMeal.getTimeLeft(now) + stoveTimeLeft
-			if overallMin > timeLeft {
-				overallMin = timeLeft
+			localPriority := getPriority(readMeal, readMeal.getTimeLeft(now)+stoveTimeLeft)
+			if priority < localPriority {
+				priority = localPriority
 				ret = readMeal
 			}
 		}
@@ -113,9 +127,9 @@ func (orderList *OrderList) getMeal(cook *Cook) *Meal {
 	for _, meal := range orderList.nilList {
 		readMeal := meal.get()
 		if readMeal.prepared == 0 && readMeal.busy == 0 && readMeal.complexity <= cook.rank {
-			timeLeft := readMeal.getTimeLeft(now)
-			if overallMin > timeLeft {
-				overallMin = timeLeft
+			localPriority := getPriority(readMeal, readMeal.getTimeLeft(now))
+			if priority < localPriority {
+				priority = localPriority
 				ret = readMeal
 			}
 		}
@@ -131,9 +145,10 @@ func (orderList *OrderList) getMeal(cook *Cook) *Meal {
 func (orderList *OrderList) getStatus() string {
 	var ret string
 
-	now := time.Now().Unix() //TODO show status with buffered spaces
+	now := getUnixTimeUnits()
 	for _, order := range orderList.orderArr {
-		ret += makeDiv("Order id:" + strconv.Itoa(order.id) + " Meals to prepare:" + strconv.Itoa(int(order.mealCounter)) +
+
+		ret += makeDiv("Order id:" + strconv.Itoa(order.id) + " Meals to prepare:" + strconv.Itoa(int(order.mealCounter)) + "/" + strconv.Itoa(len(order.items)) +
 			" Time passed:" + strconv.Itoa(int(now-order.pickUpTime)) + " Max wait:" + strconv.Itoa(order.maxWait))
 	}
 	return ret

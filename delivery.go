@@ -1,7 +1,5 @@
 package main
 
-import "time"
-
 type Delivery struct {
 	OrderId        int            `json:"order_id"`
 	TableId        int            `json:"table_id"`
@@ -21,7 +19,7 @@ func newDelivery(order *Order) *Delivery {
 	ret.Priority = order.priority
 	ret.MaxWait = order.maxWait
 	ret.PickUpTime = order.pickUpTime
-	ret.CookingTime = int(time.Now().Unix() - order.pickUpTime)
+	ret.CookingTime = int(getUnixTimeUnits() - order.pickUpTime)
 	var cookingDetails []MealDelivery
 	for _, meal := range order.mealList {
 		cookingDetails = append(cookingDetails, MealDelivery{meal.foodId, meal.cookId})

@@ -24,9 +24,11 @@ func (oh *KitchenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var requestBody = make([]byte, r.ContentLength)
 			r.Body.Read(requestBody)
 			json.Unmarshal(requestBody, latestOrder)
-			kitchen.orderList.addOrder(parseOrder(latestOrder))
+			if !kitchen.orderList.addOrder(parseOrder(latestOrder)){
+				response = "NOT OK"
+			}
 
-			//Respond with "OK"
+			//Respond with response
 			fmt.Fprint(w, response)
 		}
 	case http.MethodGet:
